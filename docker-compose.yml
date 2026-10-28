@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_face_detection
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_PORT}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis_service:
+    image: redis:7-alpine
+    container_name: redis_face_detection
+    restart: always
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+
+  elasticsearch_service:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: es_face_detection
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  fastapi-service:
+    build:
+      context: ./fastapi-service
+      dockerfile: Dockerfile
+    container_name: fastapi_face_recognition
+    ports:
+      - "${FASTAPI_PORT}:8000"
+    volumes:
+      - ./fastapi-service:/app
+      - ./fastapi-service/dataset:/app/dataset
+      - ./fastapi-service/trainer:/app/trainer
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=6379
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
+    depends_on:
+      - mysql_db
+      - redis_service
+      - elasticsearch_service
+    restart: always
+
+  laravel-app:
+    build:
+      context: ./laravel-app
+      dockerfile: Dockerfile
+    container_name: laravel_face_app
+    restart: always
+    volumes:
+      - ./laravel-app:/var/www
+    depends_on:
+      - mysql_db
+      - redis_service
+      - elasticsearch_service
+      - fastapi-service
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_face_web
+    restart: always
+    ports:
+      - "${LARAVEL_PORT}:80"
+    volumes:
+      - ./laravel-app:/var/www
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - laravel-app
+
+volumes:
+  mysql_data:
+  redis_data:
+  es_data:
