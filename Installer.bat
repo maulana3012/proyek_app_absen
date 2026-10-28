@@ -115,28 +115,38 @@ if not exist ".env" (
     ) > .env
 )
 
+:: 2. Membaca isi file .env root dan memasukkannya ke variable environment batch
+echo Membaca konfigurasi dari file .env root...
+for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+    :: Abaikan baris kosong atau baris komentar (yang diawali tanda #)
+    echo %%A | findstr /r "^#" >nul
+    if errorlevel 1 (
+        if not "%%A"=="" set "%%A=%%B"
+    )
+)
+
 :: Menyelaraskan file .env Laravel agar service container dapat saling berkomunikasi via DNS Docker Network
 if not exist "laravel-app\.env" (
     echo Menyinkronkan .env ke aplikasi Laravel...
     (
-    echo APP_NAME=Laravel
+    echo APP_NAME=%APP_NAME%
     echo APP_ENV=local
     echo APP_KEY=
     echo APP_DEBUG=true
-    echo APP_URL=http://localhost:8080
+    echo APP_URL=http://localhost:%LARAVEL_PORT%
     echo.
     echo DB_CONNECTION=mysql
-    echo DB_HOST=mysql_db
-    echo DB_PORT=3306
-    echo DB_DATABASE=db_face_recognition
-    echo DB_USERNAME=user_face
-    echo DB_PASSWORD=user_password_123
+    echo DB_HOST=%MYSQL_HOST%
+    echo DB_PORT=%MYSQL_PORT%
+    echo DB_DATABASE=%MYSQL_DATABASE%
+    echo DB_USERNAME=%MYSQL_USER%
+    echo DB_PASSWORD=%MYSQL_PASSWORD%
     echo.
-    echo REDIS_HOST=redis_service
-    echo REDIS_PORT=6379
+    echo REDIS_HOST=%REDIS_HOST%
+    echo REDIS_PORT=%REDIS_PORT%
     echo.
-    echo ELASTICSEARCH_HOST=http://elasticsearch_service:9200
-    echo FASTAPI_SERVICE_URL=http://fastapi-service:8000
+    echo ELASTICSEARCH_HOST=%ELASTICSEARCH_HOST%
+    echo FASTAPI_SERVICE_URL=http://fastapi-service:%FASTAPI_PORT%
     ) > laravel-app\.env
 )
 
